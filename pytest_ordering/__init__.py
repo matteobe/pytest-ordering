@@ -46,8 +46,29 @@ def pytest_configure(config):
         config.addinivalue_line('markers', config_line)
 
 
-def pytest_collection_modifyitems(session, config, items):
+def pytest_collection_modifyitems(session, config, items) -> None:
+    """
+    Modify (inplace) the items collected by pytest. In our case, we want to sort the execution of the items according
+    to the rules set out in the @pytest.mark.run(**kwargs)
+
+    The run marker can have the following keyword arguments:
+
+    - order: numerical or string identifying the execution order
+      First tests to be executed use a positive numeric argument (1,2,3) or the corresponding description
+      'first', 'second', 'third'
+      Last test to be executed use a negative numeric argument (-3,-2,-1) or the corresponding description
+      'third-to-last', 'second-to-last', 'last'
+    - after: name of the test that needs to be run before the present test can be run
+      e.g. @pytest.mark.run(after='test_some_other_function')
+    - before: name of the test that needs to wait for the present test to be run, before being run
+      e.g. @pytest.mark.run(before='test_dependant_functionality')
+    """
+
     grouped_items = {}
+
+    # Loop over the collected items
+    # An item has the following properties that can be helpful to create a after/before marker
+    # - originalname / name: contains the name of the test function connected to the item
 
     for item in items:
 
