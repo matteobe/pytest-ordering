@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from ._version import __version__
 
 import operator
@@ -26,17 +25,14 @@ orders_map = {
 
 
 def pytest_configure(config):
-    """Register the "run" marker."""
+    """
+    Register the 'run' marker in the pytest configuration object.
+    """
 
-    provided_by_pytest_ordering = (
-        'Provided by pytest-ordering. '
-        'See also: http://pytest-ordering.readthedocs.org/'
-    )
+    provided_by_pytest_ordering = "Provided by pytest-ordering. See also: http://pytest-ordering.readthedocs.org/"
+    config_line = "run: specify ordering information for when tests should run in relation to one another." + \
+                  provided_by_pytest_ordering
 
-    config_line = (
-        'run: specify ordering information for when tests should run '
-        'in relation to one another. ' + provided_by_pytest_ordering
-    )
     config.addinivalue_line('markers', config_line)
 
     for mark_name in orders_map.keys():
@@ -68,9 +64,11 @@ def pytest_collection_modifyitems(session, config, items) -> None:
 
     # Loop over the collected items
     # An item has the following properties that can be helpful to create a after/before marker
-    # - originalname / name: contains the name of the test function connected to the item
+    # - name: contains the name of the test function connected to the item
 
     for item in items:
+
+        print(f"Item name: {item.name}")
 
         for mark_name, order in orders_map.items():
             mark = item.get_closest_marker(mark_name)

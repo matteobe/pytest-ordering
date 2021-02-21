@@ -7,8 +7,6 @@ import pytest
 @pytest.fixture
 def item_names_for(testdir, request):
 
-    print(type(testdir))
-
     def _item_names_for(tests_content):
         # some strange code to extract sorted items
         items = testdir.getitems(tests_content)

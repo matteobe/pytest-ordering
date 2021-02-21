@@ -50,3 +50,6 @@ nosetests.xml
 
 # pyenv
 .python-version
+
+# Notebooks
+notebooks/
