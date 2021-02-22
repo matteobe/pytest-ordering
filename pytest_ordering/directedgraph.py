@@ -11,7 +11,8 @@ import copy
 from pytest_ordering.configs import start_vertices_map, end_vertices_map
 from pytest_ordering.utils import require_in_list
 
-
+# TODO: Split in two types of graph, a general directed graph utility and a specific TestItemPriorityGraph inherited
+# object
 class DirectedGraph:
 
     def __init__(self):
@@ -211,6 +212,29 @@ class DirectedGraph:
         """
         cycle = self.graph_cycle()
         return True if cycle else False
+
+    # ----------------------------- DEPENDANTS ------------------------------#
+    def get_vertex_dependants(self, vertex_id: int, direction: str = 'forward') -> List:
+        """
+        Get dependant vertices, based on a starting vertex (passed in with the internal vertex ID
+
+        Args:
+            vertex_id (int): internal numerical vertex ID
+            direction (str): direction in which the graph needs to be traversed, i.e. forward or backward
+
+        Returns:
+            vertices (list): List of dependant vertices (using internal vertex ID)
+        """
+        require_in_list(direction, ['forward', 'backward'])
+        graph = self.graph if direction == 'forward' else self.graph_inv
+
+        dependant_vertices = graph[vertex_id]
+        if dependant_vertices:
+            for dependant_vertex in dependant_vertices:
+                dependant_vertex_dependants = self.get_vertex_dependants(dependant_vertex)
+                dependant_vertices += dependant_vertex_dependants
+
+        return dependant_vertices
 
     # ----------------------------- SORTING ------------------------------#
     def sort_graph(self) -> List:
