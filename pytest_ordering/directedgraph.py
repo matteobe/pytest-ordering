@@ -1,6 +1,7 @@
 """
 DirectedGraph implements the capability to reason about order of execution of items collected by pytest.
-Cardinal ordering information (first, second, ..., second-to-last, last) can be integrated in the graph
+Cardinal ordering information (first, second, ..., second-to-last, last) can be integrated in the graph alongside
+relative ordering information (before, after).
 """
 
 from typing import Union, List
@@ -32,6 +33,18 @@ class DirectedGraph:
         self.graph_inv = defaultdict(list)
 
     # ----------------------------- VERTICES ------------------------------#
+    def get_vertex_id(self, vertex: Union[str, int, float]) -> int:
+        """
+        Function returns the internal vertex ID for an input vertex definition, if the vertex does not exist,
+        it creates it.
+        """
+        if vertex in self.vertices_map:
+            vertex_id = self.vertices_map[vertex]
+        else:
+            vertex_id = self.add_vertex(vertex)
+
+        return vertex_id
+
     def add_vertex(self, vertex: Union[str, int, float], special_vertex: str = None) -> int:
         """
         Add new vertex to the graph, including assigning a new unique ID to the vertex.
@@ -92,26 +105,23 @@ class DirectedGraph:
                 if vertex_id in self.graph_inv[start_vertex_id]:
                     self.graph_inv[start_vertex_id].remove(vertex_id)
 
-    def get_vertex_id(self, vertex: Union[str, int, float]) -> int:
-        """
-        Function returns the vertex ID for an input vertex definition, if the vertex does not exist, it creates it
-        """
-        if vertex in self.vertices_map:
-            vertex_id = self.vertices_map[vertex]
-        else:
-            vertex_id = self.add_vertex(vertex)
-
-        return vertex_id
-
     # ----------------------------- EDGES ------------------------------#
+    def add_edge_by_id(self, start_vertex: int, end_vertex: int) -> None:
+        """
+        Add an edge using the internal vertices IDs. An edge is added only if it is not already present (to avoid
+        duplication).
+        """
+        if end_vertex not in self.graph[start_vertex]:
+            self.graph[start_vertex].append(end_vertex)
+        if start_vertex not in self.graph_inv[end_vertex]:
+            self.graph_inv[end_vertex].append(start_vertex)
+
     def add_edge(self, start_vertex: Union[str, int, float], end_vertex: Union[str, int, float]) -> None:
         """
-        Add new edge to the graph
+        Add new edge to the graph based on user description of vertices IDs
         """
-        start_vertex = self.get_vertex_id(start_vertex)
-        end_vertex = self.get_vertex_id(end_vertex)
-        self.graph[start_vertex].append(end_vertex)
-        self.graph_inv[end_vertex].append(start_vertex)
+        self.add_edge_by_id(self.get_vertex_id(start_vertex),
+                            self.get_vertex_id(end_vertex))
 
     def remove_edge(self, start_vertex: Union[str, int, float], end_vertex: Union[str, int, float]) -> None:
         """
@@ -129,29 +139,19 @@ class DirectedGraph:
         """
         Add the edges for the start vertices (e.g., 'first', ..., 'tenth') if they don't already exist
         """
-
-        # TODO: Implement addition of start edges w/ check for duplication
-        # To deal with the starting conditions (first, second, third, etc..)
-        # They can be added as the root of the tree
-        # TODO: Decide where to attach the end of the first-priority execution list to the graph of before/after
-        #  relationships
-        #  - Case 1: top10 priorities is a separate graph, in which case it gets executed first
-        #  - Case 2: top10 priorities is attached to rest of graph, in which case the normal algorithm is applied
         start_vertices = [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
+        for start_vertex, end_vertex in zip(start_vertices, start_vertices[1:]):
+            self.print_edge_by_id(start_vertex, end_vertex)
+            self.add_edge_by_id(start_vertex, end_vertex)
 
     def add_end_edges(self) -> None:
         """
         Add the edges for the end vertices (e.g., 'last', ..., 'tenth_to_last') if they don't already exist
         """
-
-        # TODO: Implement addition of end edges w/ check for duplication
-        # To deal with the ending conditions (last, second-to-last, etc...)
-        # They can be added as a leaf of the tree
-        # TODO: Decide where to attach the start of the last-priority execution list to the graph of before/after
-        #  relationships
-        #  - Case 1: bottom10 priorities is a separate graph, in which case it gets executed last
-        #  - Case 2: bottom10 priorities is attached to rest of graph, in which case the normal algorithm is applied
         end_vertices = [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
+        for start_vertex, end_vertex in zip(end_vertices, end_vertices[1:]):
+            self.print_edge_by_id(start_vertex, end_vertex)
+            self.add_edge_by_id(start_vertex, end_vertex)
 
     # ----------------------------- CYCLES ------------------------------#
     def sub_cycle(self, vertex_id, vertex_visited, recursion_stack) -> List:
@@ -269,3 +269,12 @@ class DirectedGraph:
         #  time starting with the nr. 10-to-last vertex
 
         return [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
+
+    # ----------------------------- SORTING ------------------------------#
+    def print_edge_by_id(self, start_vertex: int, end_vertex: int) -> None:
+        """
+        Prints the edge definition using the user-inputted identifier
+        """
+        start_vertex = self.vertices_map_inv[start_vertex]
+        end_vertex = self.vertices_map_inv[end_vertex]
+        print(f"Edge: {start_vertex} - {end_vertex}")
