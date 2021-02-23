@@ -3,6 +3,8 @@ DirectedGraph implements a direct graph class, with methods to detect cycles, pe
 directed graph operations. The internal handling of ID is strictly using integers.
 """
 
+# TODO: Check compatibility of __future__ import
+from __future__ import annotations
 from typing import List
 from collections import defaultdict
 import copy
@@ -21,6 +23,10 @@ class BaseDirectedGraph:
         self.graph = defaultdict(list)
         self.graph_inv = defaultdict(list)
 
+        # Implement caching of responses to avoid recalculating them
+        self._recompute_cycle = True
+        self._cycle = []
+
     # ----------------------------- VERTICES ------------------------------#
     def add_vertex(self, vertex_id: int) -> None:
         """
@@ -30,6 +36,7 @@ class BaseDirectedGraph:
         """
 
         if vertex_id not in self.vertices:
+            self._recompute_cycle = True
             self.vertices.append(vertex_id)
 
     def remove_vertex(self, vertex_id: int) -> None:
@@ -41,6 +48,7 @@ class BaseDirectedGraph:
 
         if vertex_id in self.vertices:
             # Remove vertex from vertex list
+            self._recompute_cycle = True
             self.vertices.remove(vertex_id)
 
             # Remove vertex as starting point from graph & inverted graph
@@ -69,8 +77,8 @@ class BaseDirectedGraph:
         self.add_vertex(end_vertex_id)
 
         if end_vertex_id not in self.graph[start_vertex_id]:
+            self._recompute_cycle = True
             self.graph[start_vertex_id].append(end_vertex_id)
-        if start_vertex_id not in self.graph_inv[end_vertex_id]:
             self.graph_inv[end_vertex_id].append(start_vertex_id)
 
     def remove_edge(self, start_vertex_id: int, end_vertex_id: int) -> None:
@@ -83,6 +91,7 @@ class BaseDirectedGraph:
 
         if start_vertex_id in self.graph:
             if end_vertex_id in self.graph[start_vertex_id]:
+                self._recompute_cycle = True
                 self.graph[start_vertex_id].remove(end_vertex_id)
                 self.graph_inv[end_vertex_id].remove(start_vertex_id)
 
@@ -124,10 +133,13 @@ class BaseDirectedGraph:
     def get_graph_cycle(self) -> List:
         """
         If a cycle exist in the graph, return a list containing the ID in the cycle
-
         Returns:
             cycle (list): list containing the IDs of the cycle elements if a cycle exists
         """
+
+        # Returned cached response, if no changes have been made to the cycle
+        if not self._recompute_cycle:
+            return self._cycle
 
         # Initialize the tracking list to be the size of the new id, to avoid problems with deleted vertices
         num_vertices = len(self.vertices)
@@ -141,26 +153,33 @@ class BaseDirectedGraph:
                     cycle_ids.reverse()
                     cycle_ids.append(vertex_id)
 
+                    # Cache results
+                    self._cycle = cycle_ids
+                    self._recompute_cycle = False
                     return cycle_ids
 
+        # Cache results
+        self._cycle = []
+        self._recompute_cycle = False
         return []
 
     def is_cyclic(self) -> bool:
         """
-        Test if the graph is cyclic
+        Test if the graph is cyclic, use cached response if possible
         """
-        cycle = self.get_graph_cycle()
-        return True if cycle else False
+
+        if self._recompute_cycle:
+            _ = self.get_graph_cycle()
+
+        return True if self._cycle else False
 
     # ----------------------------- DEPENDANTS ------------------------------#
     def get_vertex_dependants(self, vertex_id: int, direction: str = 'forward') -> List:
         """
         Get dependant vertices, based on a starting vertex ID
-
         Args:
             vertex_id (int): numerical vertex ID to start from
             direction (str): direction in which the graph needs to be traversed, i.e. forward or backward
-
         Returns:
             vertices (list): List of dependant vertices IDs
         """
@@ -170,7 +189,7 @@ class BaseDirectedGraph:
         try:
             vertex_dependants = self._get_vertex_dependants(vertex_id, direction=direction)
             vertex_dependants = list(set(vertex_dependants))
-        except RecursionError as err:
+        except RecursionError:
             print("A recursion error is probably being caused by a cycle in the graph. Please make sure your directed "
                   "graph has no cycles.")
             raise
@@ -195,66 +214,50 @@ class BaseDirectedGraph:
     # ----------------------------- SORTING ------------------------------#
     def sort_graph(self) -> List:
         """
-        Create a topological sorting of the graph, based on the directions in the graph
+        Create a topological sorting of the graph, based on the directions in the graph.
         """
 
+        # Create a copy of the graph that can be manipulated for sorting
         graph = copy.deepcopy(self)
 
-        if graph.check_start_edges():
-            return []
+        # Initialize the tracking list of which vertices have already been sorted and the sorting order
+        unsorted_vertices = copy.deepcopy(self.vertices)
+        sorted_vertices = []
 
-        # TODO: How do you construct the execution list
-        #  Apply topological sort algorithm (https://personal.utdallas.edu/~ravip/cs3345/slidesweb/node7.html)
-        #  Step in procedure
-        #  - Identify vertex without incoming edges
-        #  - Add vertex to reversed_execution list
-        #  - Remove the vertex from the graph (including incoming edges)
-        #  - Repeat procedure for rest of graph
-        #  Procedure order
-        #  - Begin with bottom10 vertices
-        #  - Perform on rest of graph (excluding top10 vertices)
-        #  - Conclude with top10 vertices
+        while len(unsorted_vertices) > 1:
+            # Get next end-vertex add it to the sorted list
+            vertex_id = self.get_next_end_vertex(graph, unsorted_vertices)
+            sorted_vertices.append(vertex_id)
 
-        # Check that the start_vertices sequence is respected
-        start_vertices = [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
+            # Remove the vertex from the graph and the unsorted vertices list and repeat
+            unsorted_vertices.remove(vertex_id)
+            graph.remove_vertex(vertex_id)
 
-        # Check that end_vertices sequence is respected
-        end_vertices = [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
+        # Add last unsorted vertex (which by default will not have any edges) and reverse list
+        sorted_vertices.append(unsorted_vertices[0])
+        sorted_vertices.reverse()
 
-        return []
+        return sorted_vertices
 
-    def check_start_edges(self) -> List:
+    @staticmethod
+    def get_next_end_vertex(graph: BaseDirectedGraph, remaining_vertices: List[int]) -> int:
         """
-        Check that the start edges ('first' to 'tenth') can be executed in the correct sequence
-
-        Return:
-            start_vertices (list): List of the ordered start vertices, if they can be executed in the correct sequence
+        Function returns the first possible vertex that is a dead-end (i.e. no outgoing edge)
+        Args:
+            graph (BaseDirectedGraph): BaseDirectedGraph containing the edges information
+            remaining_vertices (list): list of IDs of remaining vertices
+        Returns:
+            next_vertex (int): ID of next vertex without outgoing edges
         """
 
-        # TODO: Identify if there is a priority conflict for the top10 vertices
-        #   Approach: Create the "source" tree for the nr. 10 vertex and if there are vertices other than the top 10,
-        #   then here is a priority conflict
+        if not remaining_vertices:
+            raise ValueError("Input 'remaining_vertices' is empty. Please provide a non-empty input list.")
 
-        return [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
+        # Loop over the remaining vertices and return the first remaining vertex without outgoing edges
+        for vertex_id in remaining_vertices:
+            if not graph.graph[vertex_id]:
+                return vertex_id
 
-    def check_end_edges(self) -> List:
-        """
-        Check that the end edges ('tenth-to-last' to 'last') can be executed in the correct sequence
-
-        Return:
-            end_vertices (list): List of the ordered end vertices if they can be executed in the correct sequence
-        """
-        # TODO: Identify if there is a priority conflict for the bottom10 vertices
-        #  Approach: Reverse graphs direction of edge and perform the same procedure as for the nr. 10 vertex, this
-        #  time starting with the nr. 10-to-last vertex
-
-        return [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
-
-    # ----------------------------- SORTING ------------------------------#
-    def print_edge_by_id(self, start_vertex: int, end_vertex: int) -> None:
-        """
-        Prints the edge definition using the user-inputted identifier
-        """
-        start_vertex = self.vertices_map_inv[start_vertex]
-        end_vertex = self.vertices_map_inv[end_vertex]
-        print(f"Edge: {start_vertex} - {end_vertex}")
+        err_msg = "None of the remaining vertices has no outgoing edges, i.e. they are part of a cycle. " \
+                  "Please use the get_graph_cycle function to identify the vertex that are part of the cycle."
+        raise ValueError(err_msg)
