@@ -1,40 +1,36 @@
 """
-DirectedGraph implements the capability to reason about order of execution of items collected by pytest.
-Cardinal ordering information (first, second, ..., second-to-last, last) can be integrated in the graph alongside
-relative ordering information (before, after).
+DirectedGraph implements a direct graph class, with methods to detect cycles, perform topological sorting and other
+directed graph operations. The edges can be defined using either integer, floats or string.
+DirectedGraph is an extension of the BaseDirectedGraph class and handles the mapping of user-defined IDs to strictly
+integers IDs.
 """
 
 from typing import Union, List
-from collections import defaultdict
 import copy
 
-from pytest_ordering.configs import start_vertices_map, end_vertices_map
+from pytest_ordering.basegraph import BaseDirectedGraph
 from pytest_ordering.utils import require_in_list
 
-# TODO: Split in two types of graph, a general directed graph utility and a specific TestItemPriorityGraph inherited
-# object
+
 class DirectedGraph:
 
     def __init__(self):
         """
-        Initialize a new graph object, including dictionaries to keep track of the vertices and edges
+        Initialize a new graph object, including dictionaries to keep track of the vertices numeric IDs
         """
-        # Counters
+        # ID generator counter and other counters
         self.new_id = 0
-        self.vertices = 0
+        self.num_vertices = 0
 
-        # Vertices tracking
+        # Vertices IDs tracking
         self.vertices_map = {}
         self.vertices_map_inv = {}
-        self.start_vertices = [None] * len(start_vertices_map)
-        self.end_vertices = [None] * len(end_vertices_map)
 
-        # Edges tracking
-        self.graph = defaultdict(list)
-        self.graph_inv = defaultdict(list)
+        # Graph object
+        self.graph = BaseDirectedGraph()
 
     # ----------------------------- VERTICES ------------------------------#
-    def get_vertex_id(self, vertex: Union[str, int, float]) -> int:
+    def _get_vertex_id(self, vertex: Union[str, int, float]) -> int:
         """
         Function returns the internal vertex ID for an input vertex definition, if the vertex does not exist,
         it creates it.
@@ -46,193 +42,97 @@ class DirectedGraph:
 
         return vertex_id
 
-    def add_vertex(self, vertex: Union[str, int, float], special_vertex: str = None) -> int:
+    def add_vertex(self, vertex: Union[str, int, float]) -> int:
         """
         Add new vertex to the graph, including assigning a new unique ID to the vertex.
-        Internally, the graph is represented using integer ID for vertices (faster calculation than with strings)
 
         Args:
-            vertex (str, int, float): the vertex identifier chosen by the user
-            special_vertex (str): can be used to identify special vertices, can be 'first', ..., 'tenth' for starting
-            vertices and 'last', ..., 'tenth_to_last' for ending vertices
+            vertex (str, int, float): the vertex identifier specified by the user.
+        Returns:
+            vertex_id (int): internal numerical vertex ID
         """
 
-        if special_vertex is not None:
-            require_in_list(special_vertex, list(start_vertices_map.keys()) + list(end_vertices_map.keys()))
-
+        # Get new vertex ID and keep track of the mapping in both directions
         vertex_id = self.new_id
         self.new_id += 1
-        self.vertices += 1
+        self.num_vertices += 1
         self.vertices_map[vertex] = vertex_id
         self.vertices_map_inv[vertex_id] = vertex
 
-        if special_vertex is not None:
-            if special_vertex in list(start_vertices_map.keys()):
-                self.start_vertices[start_vertices_map[special_vertex]] = vertex_id
-            else:
-                self.end_vertices[end_vertices_map[special_vertex]] = vertex_id
+        # Add the vertex to the graph
+        self.graph.add_vertex(vertex_id)
 
         return vertex_id
 
     def remove_vertex(self, vertex: Union[str, int, float]) -> None:
         """
         Remove a vertex from the graph
+        Args:
+            vertex (str, int, float): the vertex identifier specified by the user
         """
 
-        # Remove vertex only if it's listed in the vertex list
         if vertex in self.vertices_map:
-            self.vertices -= 1
-            # Remove from vertices list
+            self.num_vertices -= 1
+
+            # Remove from vertices map list
             vertex_id = self.vertices_map.pop(vertex)
             _ = self.vertices_map_inv.pop(vertex_id)
 
-            # Remove from start or end vertices list
-            if vertex_id in self.start_vertices:
-                self.start_vertices[self.start_vertices.index(vertex_id)] = None
-            elif vertex_id in self.end_vertices:
-                self.end_vertices[self.end_vertices.index(vertex_id)] = None
-
-            # Remove vertex as starting point from graph & inverted graph only if it was used
-            if vertex_id in self.graph:
-                _ = self.graph.pop(vertex_id)
-            if vertex_id in self.graph_inv:
-                _ = self.graph_inv.pop(vertex_id)
-
-            # Remove vertex as end point from graph & inverted graph only if it was used
-            for start_vertex_id in self.graph:
-                if vertex_id in self.graph[start_vertex_id]:
-                    self.graph[start_vertex_id].remove(vertex_id)
-            for start_vertex_id in self.graph_inv:
-                if vertex_id in self.graph_inv[start_vertex_id]:
-                    self.graph_inv[start_vertex_id].remove(vertex_id)
+            # Remove vertex from graph
+            self.graph.remove_vertex(vertex_id)
 
     # ----------------------------- EDGES ------------------------------#
-    def add_edge_by_id(self, start_vertex: int, end_vertex: int) -> None:
-        """
-        Add an edge using the internal vertices IDs. An edge is added only if it is not already present (to avoid
-        duplication).
-        """
-        if end_vertex not in self.graph[start_vertex]:
-            self.graph[start_vertex].append(end_vertex)
-        if start_vertex not in self.graph_inv[end_vertex]:
-            self.graph_inv[end_vertex].append(start_vertex)
-
     def add_edge(self, start_vertex: Union[str, int, float], end_vertex: Union[str, int, float]) -> None:
         """
-        Add new edge to the graph based on user description of vertices IDs
+        Add new edge to the graph
+        Args:
+            start_vertex (str, int, float): the start vertex identifier specified by the user
+            end_vertex (str, int, float): the end vertex identifier specified by the user
         """
-        self.add_edge_by_id(self.get_vertex_id(start_vertex),
-                            self.get_vertex_id(end_vertex))
+        self.graph.add_edge(self._get_vertex_id(start_vertex),
+                            self._get_vertex_id(end_vertex))
 
     def remove_edge(self, start_vertex: Union[str, int, float], end_vertex: Union[str, int, float]) -> None:
         """
         Remove an edge from the graph
+        Args:
+            start_vertex (str, int, float): the start vertex identifier specified by the user
+            end_vertex (str, int, float): the end vertex identifier specified by the user
         """
-        start_vertex = self.get_vertex_id(start_vertex)
-        end_vertex = self.get_vertex_id(end_vertex)
-
-        if start_vertex in self.graph:
-            if end_vertex in self.graph[start_vertex]:
-                self.graph[start_vertex].remove(end_vertex)
-                self.graph_inv[end_vertex].remove(start_vertex)
-
-    def add_start_edges(self) -> None:
-        """
-        Add the edges for the start vertices (e.g., 'first', ..., 'tenth') if they don't already exist
-        """
-        start_vertices = [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
-        for start_vertex, end_vertex in zip(start_vertices, start_vertices[1:]):
-            self.print_edge_by_id(start_vertex, end_vertex)
-            self.add_edge_by_id(start_vertex, end_vertex)
-
-    def add_end_edges(self) -> None:
-        """
-        Add the edges for the end vertices (e.g., 'last', ..., 'tenth_to_last') if they don't already exist
-        """
-        end_vertices = [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
-        for start_vertex, end_vertex in zip(end_vertices, end_vertices[1:]):
-            self.print_edge_by_id(start_vertex, end_vertex)
-            self.add_edge_by_id(start_vertex, end_vertex)
+        self.graph.remove_edge(self._get_vertex_id(start_vertex),
+                               self._get_vertex_id(end_vertex))
 
     # ----------------------------- CYCLES ------------------------------#
-    def sub_cycle(self, vertex_id, vertex_visited, recursion_stack) -> List:
-        """
-        Function checks if any of the children nodes is in the recursion stack and returns a list with the
-        cycle elements in it
-        """
-
-        # Mark current node as visited and add it to the recursion stack
-        vertex_visited[vertex_id] = True
-        recursion_stack[vertex_id] = True
-
-        # Recur for all neighbours, if any neighbour is visited and in recursion stack then graph is cyclic
-        for neighbour_id in self.graph[vertex_id]:
-            if not vertex_visited[neighbour_id]:
-                sub_cycle_ids = self.sub_cycle(neighbour_id, vertex_visited, recursion_stack)
-                if sub_cycle_ids:
-                    sub_cycle_ids.append(vertex_id)
-                    return sub_cycle_ids
-            elif recursion_stack[neighbour_id]:
-                return [vertex_id]
-
-        # The node needs to be popped from recursion stack before function ends
-        recursion_stack[vertex_id] = False
-
-        return []
-
     def graph_cycle(self) -> List:
         """
-        Test if the graph is cyclic and return a list containing the ID in the cycle if one is found
+        Test if the graph is cyclic and return a list containing the user-defined IDs in the cycle if one is found
 
         Returns:
-            cyclic (bool): True if graph contains a cyclic component, False if not
+            cyclic (list): list containing the user-defined IDs of the cycle vertices if a cycle exists
         """
 
-        # Initialize the tracking list to be the size of the new id, to avoid problems with deleted vertices
-        vertex_visited = [False] * self.new_id
-        recursion_stack = [False] * self.new_id
+        # Get the graph cycle from the integers graph
+        cycle_ids = self.graph.get_graph_cycle()
+        cycle_vertices = [self.vertices_map_inv[vertex] for vertex in cycle_ids]
 
-        for vertex_id in self.vertices_map_inv.keys():
-            if not vertex_visited[vertex_id]:
-                cycle_ids = self.sub_cycle(vertex_id, vertex_visited, recursion_stack)
-                if cycle_ids:
-                    cycle_ids.reverse()
-                    cycle_ids.append(vertex_id)
-
-                    # Return cycle with original vertices names
-                    cycle = [self.vertices_map_inv[vertex_id] for vertex_id in cycle_ids]
-
-                    return cycle
-
-        return []
-
-    def is_cyclic(self) -> bool:
-        """
-        Test if the graph is cyclic
-        """
-        cycle = self.graph_cycle()
-        return True if cycle else False
+        return cycle_vertices
 
     # ----------------------------- DEPENDANTS ------------------------------#
-    def get_vertex_dependants(self, vertex_id: int, direction: str = 'forward') -> List:
+    def get_vertex_dependants(self, vertex: Union[str, int, float], direction: str = 'forward') -> List:
         """
-        Get dependant vertices, based on a starting vertex (passed in with the internal vertex ID
-
+        Get dependant vertices, based on a starting vertex
         Args:
-            vertex_id (int): internal numerical vertex ID
+            vertex (str, int, float): user-defined vertex ID to get dependants for
             direction (str): direction in which the graph needs to be traversed, i.e. forward or backward
-
         Returns:
-            vertices (list): List of dependant vertices (using internal vertex ID)
+            vertices (list): List of dependant vertices
         """
-        require_in_list(direction, ['forward', 'backward'])
-        graph = self.graph if direction == 'forward' else self.graph_inv
 
-        dependant_vertices = graph[vertex_id]
-        if dependant_vertices:
-            for dependant_vertex in dependant_vertices:
-                dependant_vertex_dependants = self.get_vertex_dependants(dependant_vertex)
-                dependant_vertices += dependant_vertex_dependants
+        require_in_list(direction, ['forward', 'backward'])
+        vertex_id = self._get_vertex_id(vertex)
+
+        dependant_ids = self.graph.get_vertex_dependants(vertex_id, direction=direction)
+        dependant_vertices = [self.vertices_map_inv[vertex_id] for vertex_id in dependant_ids]
 
         return dependant_vertices
 
@@ -293,12 +193,3 @@ class DirectedGraph:
         #  time starting with the nr. 10-to-last vertex
 
         return [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
-
-    # ----------------------------- SORTING ------------------------------#
-    def print_edge_by_id(self, start_vertex: int, end_vertex: int) -> None:
-        """
-        Prints the edge definition using the user-inputted identifier
-        """
-        start_vertex = self.vertices_map_inv[start_vertex]
-        end_vertex = self.vertices_map_inv[end_vertex]
-        print(f"Edge: {start_vertex} - {end_vertex}")
