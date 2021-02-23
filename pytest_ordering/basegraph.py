@@ -3,13 +3,11 @@ DirectedGraph implements a direct graph class, with methods to detect cycles, pe
 directed graph operations. The internal handling of ID is strictly using integers.
 """
 
-# TODO: Check compatibility of __future__ import
-from __future__ import annotations
 from typing import List
 from collections import defaultdict
 import copy
 
-from pytest_ordering.utils import require_in_list
+from pytest_ordering.utils import require_in_list, require_not_empty
 
 
 class BaseDirectedGraph:
@@ -212,10 +210,15 @@ class BaseDirectedGraph:
         return dependant_vertices
 
     # ----------------------------- SORTING ------------------------------#
-    def sort_graph(self) -> List:
+    def sort_graph(self, isolated_vertices_position: str = 'end') -> List:
         """
         Create a topological sorting of the graph, based on the directions in the graph.
+        Args:
+            isolated_vertices_position (str): define if isolated vertices go at the beginning or at the end of the
+                sorted list. Valid values are 'start' and 'end'.
         """
+
+        require_in_list(isolated_vertices_position, ['start', 'end'])
 
         # Create a copy of the graph that can be manipulated for sorting
         graph = copy.deepcopy(self)
@@ -224,40 +227,61 @@ class BaseDirectedGraph:
         unsorted_vertices = copy.deepcopy(self.vertices)
         sorted_vertices = []
 
+        isolated_vertices = graph.get_isolated_vertices()
+        for vertex_id in isolated_vertices:
+            unsorted_vertices.remove(vertex_id)
+            graph.remove_vertex(vertex_id)
+
         while len(unsorted_vertices) > 1:
             # Get next end-vertex add it to the sorted list
-            vertex_id = self.get_next_end_vertex(graph, unsorted_vertices)
+            vertex_id = graph.get_next_end_vertex(unsorted_vertices)
             sorted_vertices.append(vertex_id)
 
             # Remove the vertex from the graph and the unsorted vertices list and repeat
             unsorted_vertices.remove(vertex_id)
             graph.remove_vertex(vertex_id)
 
-        # Add last unsorted vertex (which by default will not have any edges) and reverse list
+        # Add last unsorted vertex (which by default will not have any edges) and reverse the list
         sorted_vertices.append(unsorted_vertices[0])
         sorted_vertices.reverse()
 
+        if isolated_vertices_position == 'end':
+            sorted_vertices.extend(isolated_vertices)
+        else:
+            isolated_vertices.extend(sorted_vertices)
+            sorted_vertices = isolated_vertices
+
         return sorted_vertices
 
-    @staticmethod
-    def get_next_end_vertex(graph: BaseDirectedGraph, remaining_vertices: List[int]) -> int:
+    def get_next_end_vertex(self, remaining_vertices: List[int]) -> int:
         """
         Function returns the first possible vertex that is a dead-end (i.e. no outgoing edge)
         Args:
-            graph (BaseDirectedGraph): BaseDirectedGraph containing the edges information
             remaining_vertices (list): list of IDs of remaining vertices
         Returns:
             next_vertex (int): ID of next vertex without outgoing edges
         """
 
-        if not remaining_vertices:
-            raise ValueError("Input 'remaining_vertices' is empty. Please provide a non-empty input list.")
+        require_not_empty(remaining_vertices, failure_message="Input 'remaining_vertices' must not be empty.")
 
         # Loop over the remaining vertices and return the first remaining vertex without outgoing edges
         for vertex_id in remaining_vertices:
-            if not graph.graph[vertex_id]:
+            if not self.graph[vertex_id]:
                 return vertex_id
 
         err_msg = "None of the remaining vertices has no outgoing edges, i.e. they are part of a cycle. " \
                   "Please use the get_graph_cycle function to identify the vertex that are part of the cycle."
         raise ValueError(err_msg)
+
+    def get_isolated_vertices(self) -> List:
+        """
+        Function identified and returns the IDs of the vertices that have neither an entry nor an exit edge
+        """
+
+        isolated_vertices = []
+
+        for vertex_id in self.vertices:
+            if not self.graph[vertex_id] and not self.graph_inv[vertex_id]:
+                isolated_vertices.append(vertex_id)
+
+        return isolated_vertices

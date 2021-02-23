@@ -2,7 +2,7 @@
 Utilities functions used to perform input validation, etc.
 """
 
-from typing import Union, List
+from typing import List
 
 
 class ValidationError(BaseException):

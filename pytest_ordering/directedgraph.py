@@ -137,16 +137,21 @@ class DirectedGraph:
         return dependant_vertices
 
     # ----------------------------- SORTING ------------------------------#
-    def sort_graph(self) -> List:
+    def sort_graph(self, isolated_vertices_position: str = 'end') -> List:
         """
         Create a topological sorting of the graph, based on the directions in the graph.
+        Args:
+            isolated_vertices_position (str): define if isolated vertices go at the beginning or at the end of the
+                sorted list. Valid values are 'start' and 'end'.
         """
+
+        require_in_list(isolated_vertices_position, ['start', 'end'])
 
         # Create a copy of the graph that can be manipulated
         graph = copy.deepcopy(self.graph)
 
         # Retrieve the sorting of the vertices and map them to the user-defined IDs
-        sorted_vertices_ids = graph.sort_graph()
+        sorted_vertices_ids = graph.sort_graph(isolated_vertices_position=isolated_vertices_position)
         sorted_vertices = [self.vertices_map_inv[vertex_id] for vertex_id in sorted_vertices_ids]
 
         return sorted_vertices
