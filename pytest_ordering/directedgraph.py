@@ -139,57 +139,14 @@ class DirectedGraph:
     # ----------------------------- SORTING ------------------------------#
     def sort_graph(self) -> List:
         """
-        Create a topological sorting of the graph, based on the directions in the graph
+        Create a topological sorting of the graph, based on the directions in the graph.
         """
 
-        graph = copy.deepcopy(self)
+        # Create a copy of the graph that can be manipulated
+        graph = copy.deepcopy(self.graph)
 
-        if graph.check_start_edges():
-            return []
+        # Retrieve the sorting of the vertices and map them to the user-defined IDs
+        sorted_vertices_ids = graph.sort_graph()
+        sorted_vertices = [self.vertices_map_inv[vertex_id] for vertex_id in sorted_vertices_ids]
 
-        # TODO: How do you construct the execution list
-        #  Apply topological sort algorithm (https://personal.utdallas.edu/~ravip/cs3345/slidesweb/node7.html)
-        #  Step in procedure
-        #  - Identify vertex without incoming edges
-        #  - Add vertex to reversed_execution list
-        #  - Remove the vertex from the graph (including incoming edges)
-        #  - Repeat procedure for rest of graph
-        #  Procedure order
-        #  - Begin with bottom10 vertices
-        #  - Perform on rest of graph (excluding top10 vertices)
-        #  - Conclude with top10 vertices
-
-        # Check that the start_vertices sequence is respected
-        start_vertices = [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
-
-        # Check that end_vertices sequence is respected
-        end_vertices = [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
-
-        return []
-
-    def check_start_edges(self) -> List:
-        """
-        Check that the start edges ('first' to 'tenth') can be executed in the correct sequence
-
-        Return:
-            start_vertices (list): List of the ordered start vertices, if they can be executed in the correct sequence
-        """
-
-        # TODO: Identify if there is a priority conflict for the top10 vertices
-        #   Approach: Create the "source" tree for the nr. 10 vertex and if there are vertices other than the top 10,
-        #   then here is a priority conflict
-
-        return [vertex_id for vertex_id in self.start_vertices if vertex_id is not None]
-
-    def check_end_edges(self) -> List:
-        """
-        Check that the end edges ('tenth-to-last' to 'last') can be executed in the correct sequence
-
-        Return:
-            end_vertices (list): List of the ordered end vertices if they can be executed in the correct sequence
-        """
-        # TODO: Identify if there is a priority conflict for the bottom10 vertices
-        #  Approach: Reverse graphs direction of edge and perform the same procedure as for the nr. 10 vertex, this
-        #  time starting with the nr. 10-to-last vertex
-
-        return [vertex_id for vertex_id in self.end_vertices if vertex_id is not None]
+        return sorted_vertices
