@@ -8,7 +8,7 @@ integers IDs.
 from typing import Union, List
 import copy
 
-from pytest_ordering.basegraph import BaseDirectedGraph
+from pytest_ordering.graphs.basegraph import BaseDirectedGraph
 from pytest_ordering.utils import require_in_list
 
 
@@ -18,9 +18,8 @@ class DirectedGraph:
         """
         Initialize a new graph object, including dictionaries to keep track of the vertices numeric IDs
         """
-        # ID generator counter and other counters
+        # ID generator counter
         self.new_id = 0
-        self.num_vertices = 0
 
         # Vertices IDs tracking
         self.vertices_map = {}
@@ -55,7 +54,6 @@ class DirectedGraph:
         # Get new vertex ID and keep track of the mapping in both directions
         vertex_id = self.new_id
         self.new_id += 1
-        self.num_vertices += 1
         self.vertices_map[vertex] = vertex_id
         self.vertices_map_inv[vertex_id] = vertex
 
@@ -72,8 +70,6 @@ class DirectedGraph:
         """
 
         if vertex in self.vertices_map:
-            self.num_vertices -= 1
-
             # Remove from vertices map list
             vertex_id = self.vertices_map.pop(vertex)
             _ = self.vertices_map_inv.pop(vertex_id)
@@ -116,6 +112,17 @@ class DirectedGraph:
         cycle_vertices = [self.vertices_map_inv[vertex] for vertex in cycle_ids]
 
         return cycle_vertices
+
+    def is_graph_acyclic(self) -> bool:
+        """
+        Test that the graph does not contain a cyclic component
+        """
+        cycle_vertices = self.graph_cycle()
+
+        if not cycle_vertices:
+            return True
+
+        return False
 
     # ----------------------------- DEPENDANTS ------------------------------#
     def get_vertex_dependants(self, vertex: Union[str, int, float], direction: str = 'forward') -> List:

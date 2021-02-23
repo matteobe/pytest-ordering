@@ -2,7 +2,7 @@
 Configuration variables
 """
 
-start_vertices_map = {
+start_test_items_map = {
     'first': 0,
     'second': 1,
     'third': 2,
@@ -15,7 +15,7 @@ start_vertices_map = {
     'tenth': 9,
 }
 
-end_vertices_map = {
+end_test_items_map = {
     'tenth_to_last': 0,
     'ninth_to_last': 1,
     'eighth_to_last': 2,
@@ -27,3 +27,5 @@ end_vertices_map = {
     'second_to_last': 8,
     'last': 9,
 }
+
+special_test_items = list(start_test_items_map.keys()) + list(end_test_items_map.keys())

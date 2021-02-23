@@ -232,18 +232,19 @@ class BaseDirectedGraph:
             unsorted_vertices.remove(vertex_id)
             graph.remove_vertex(vertex_id)
 
-        while len(unsorted_vertices) > 1:
-            # Get next end-vertex add it to the sorted list
-            vertex_id = graph.get_next_end_vertex(unsorted_vertices)
-            sorted_vertices.append(vertex_id)
+        if len(unsorted_vertices) > 0:
+            while len(unsorted_vertices) > 1:
+                # Get next end-vertex add it to the sorted list
+                vertex_id = graph.get_next_end_vertex(unsorted_vertices)
+                sorted_vertices.append(vertex_id)
 
-            # Remove the vertex from the graph and the unsorted vertices list and repeat
-            unsorted_vertices.remove(vertex_id)
-            graph.remove_vertex(vertex_id)
+                # Remove the vertex from the graph and the unsorted vertices list and repeat
+                unsorted_vertices.remove(vertex_id)
+                graph.remove_vertex(vertex_id)
 
-        # Add last unsorted vertex (which by default will not have any edges) and reverse the list
-        sorted_vertices.append(unsorted_vertices[0])
-        sorted_vertices.reverse()
+            # Add last unsorted vertex (which by default will not have any edges) and reverse the list
+            sorted_vertices.append(unsorted_vertices[0])
+            sorted_vertices.reverse()
 
         if isolated_vertices_position == 'end':
             sorted_vertices.extend(isolated_vertices)

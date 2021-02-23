@@ -26,3 +26,10 @@ def require_in_list(item, valid_items: List):
     if item not in valid_items:
         failure_message = f"Item '{item}' not in valid items list: {', '.join(valid_items)}"
         raise ValidationError(message=failure_message)
+
+
+class SortingError(BaseException):
+
+    def __init__(self, message: str):
+        self.message = message
+        super(SortingError, self).__init__(message)

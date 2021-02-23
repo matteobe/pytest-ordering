@@ -51,5 +51,5 @@ nosetests.xml
 # pyenv
 .python-version
 
-# Notebooks
-notebooks/
+# Local files
+local/
